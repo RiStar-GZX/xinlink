@@ -1,8 +1,8 @@
 #include <event.h>
 #include <network.h>
 
-XLll * app_ll;
-XLll * event_ll;
+XLll * app_ll=ll_create(sizeof(XLapp_contain));
+XLll * event_ll=ll_create(sizeof(XLevent));
 
 int app_add(const char* name,EVENT event)
 {
@@ -13,7 +13,7 @@ int app_add(const char* name,EVENT event)
     app_new.event=event;
 
     extern XLll * app_ll;
-    if(app_ll==NULL)app_ll=ll_create(sizeof(XLapp_contain));
+
     //添加首个成员
     if(app_ll->head==NULL){
         ll_add_member_head(app_ll,&app_new,sizeof(XLapp_contain));
@@ -52,10 +52,11 @@ int app_remove(app_contain_id_t id)
     for(int i=0;i<app_ll->member_num;i++){
         XLapp_contain * app_now=(XLapp_contain*)member_now->data;
         if(app_now->id==id){
+            member_now=member_now->next;
             ll_del_member_num(app_ll,i);
             return 1;
         }
-        member_now=member_now->next;
+        else member_now=member_now->next;
     }
     return -1;
 }
@@ -110,13 +111,15 @@ event_id_t event_create(XLapp_info * info,EVENT event){
     if(info==NULL)return 0;
     XLsource source;
     source.mode=SOURCE_EVENTID;
+    strcpy(source.name,info->name);
     XLevent event_new;
     event_new.id=1;
     event_new.event=event;
     event_new.info=*info;
+    event_new.soot_send_ll=*ll_create(sizeof(XLsoot_send));
+    event_new.ret_ins_ll=*ll_create(sizeof(ret_ins));
     extern XLll * event_ll;
-    if(event_ll==NULL)event_ll=ll_create(sizeof(XLevent));
-    //添加首个成员
+     //添加首个成员
     if(event_ll->head==NULL){
         source.id=event_new.id;
         event_new.mon_id=monitor_create(&source);
@@ -158,10 +161,11 @@ int event_remove(event_id_t id)
     for(int i=0;i<event_ll->member_num;i++){
         XLevent * event_now=(XLevent*)member_now->data;
         if(event_now->id==id){
+            member_now=member_now->next;
             ll_del_member_num(event_ll,i);
             return 1;
         }
-        member_now=member_now->next;
+        else member_now=member_now->next;
     }
     return -1;
 }
@@ -170,6 +174,15 @@ XLevent * event_get_by_id(event_id_t id)
 {
     extern XLll * event_ll;
     XLll_member *member=ll_get_member_compare(event_ll,FRONTSIZE_EVENT_ID,sizeof(event_id_t),&id);
+    if(member==NULL)return NULL;
+    return (XLevent*)member->data;
+}
+
+XLevent * event_get_by_name(const char * name)
+{
+    if(name==NULL)return NULL;
+    extern XLll * event_ll;
+    XLll_member *member=ll_get_member_compare(event_ll,FRONTSIZE_EVENT_NAME,sizeof(event_id_t),(void*)name);
     if(member==NULL)return NULL;
     return (XLevent*)member->data;
 }
@@ -205,39 +218,72 @@ event_id_t event_create_and_run(const char* app_name){
     return event_id;
 }
 
+void * e_thread(void *arg){
+    XLevent *event=(XLevent*)arg;
+    XLsource * source=monitor_get_source(event->mon_id);
 
-#ifdef PLATFORM_ESP32
-void event_thread(void * arg)
-#endif
-#ifdef PLATFORM_LINUX
-    void * event_thread(void * arg)
-#endif
+    XLevent_par par;
+    par.source=source;
+    par.event_id=event->id;
+    par.mon_id=event->mon_id;
+
+    event->event(&par);
+    return NULL;
+}
+
+void * event_thread(void * arg)
 {
     XLevent *event=(XLevent*)arg;
     XLsource * source=monitor_get_source(event->mon_id);
-    /*while(1){
-        XLqueue *member=monitor_get_member_in(event->mon_id);
-        if(member==NULL){
-            usleep(1000);
-            continue;
-        }*/
-        XLevent_par par;
-        par.source=source;
-        //par.mode=member->mode;
-        //par.pak_in=member->in;
-        par.mon_id=event->mon_id;
 
-        event->event(&par);
+    /*XLevent_par par;
+    par.source=source;
+    par.event_id=event->id;
+    par.mon_id=event->mon_id;*/
 
-        monitor_remove_all_member(event->mon_id);
-    //}
+    pthread_t thread;
+    pthread_create(&thread,NULL,e_thread,event);
+    while(1)
+    {
+        XLpak_ins * ins_recv=monitor_get_pak_ins_delay(event->mon_id,5000);
+        if(ins_recv==NULL)continue;
+        if(ins_recv->mode==INS_SEND){
+            XLll_member * member=ll_get_member_compare(&event->soot_send_ll,0,strlen(ins_recv->Ins.op_name)+1,(void*)ins_recv->Ins.op_name);
+            if(member!=NULL){
+                XLsoot_send * soot=(XLsoot_send*)member->data;
+                XLsoot_par soot_par;
+                soot_par.event_id=event->id;
+                soot_par.source=source;
+                soot_par.ins=ins_recv;
+                soot_run(soot->soot,&soot_par);
+            }
+        }
+        else if(ins_recv->mode==INS_RECV){
+            XLll_member * member=ll_get_member_compare(&event->ret_ins_ll,0,sizeof(uint),&ins_recv->mark);
+            if(member!=NULL){
+                ret_ins * mark=(ret_ins*)member->data;
+                if(mark->mode==RET_INS_MARK_MODE_INS){
+                    mark->ins=ins_recv;
+                }
+                if(mark->mode==RET_INS_MARK_MODE_SOOT&&mark->soot!=NULL){
+                    XLsoot_par soot_par;
+                    soot_par.event_id=event->id;
+                    soot_par.source=source;
+                    soot_par.ins=ins_recv;
+                    soot_par.error_code=SOOT_ERROR_CODE_NONE;
+                    ll_del_member(&event->ret_ins_ll,member);
+                    soot_run(mark->soot,&soot_par);
+                }
+            }
+        }
+        monitor_remove_member(event->mon_id);
+    }
+
+    monitor_remove_all_member(event->mon_id);
     event_remove(event->id);
-#ifdef PLATFORM_LINUX
     return NULL;
-#endif
 }
 
-#ifdef PLATFORM_LINUX
 int event_run(event_id_t id)
 {
     pthread_t thread;
@@ -247,17 +293,6 @@ int event_run(event_id_t id)
     if(!thread)perror("thread");
     return 1;
 }
-#endif
-
-#ifdef PLATFORM_ESP32
-int event_run(event_id_t id)
-{
-    //pthread_t thread;
-    XLevent * event=event_get_by_id(id);
-    xTaskCreate(event_thread,"broadcast_recv",4096,event,0,NULL);
-    return 1;
-}
-#endif
 
 /*
 int event_set_device_mark(event_id_t id,const char * name,XLsource * source,uint state){
@@ -352,3 +387,43 @@ int send_to_link_event(XLpak_info * info){
     return 1;
 }
 */
+
+int soot_create(event_id_t id,const char * op_name,SOOT soot){
+    if(soot==NULL||op_name==NULL)return 0;
+    XLevent * event=event_get_by_id(id);
+    if(event==NULL)return 0;
+    if(ll_get_member_compare(&event->soot_send_ll,0,strlen(op_name)+1,(void*)op_name)!=NULL)return 0;   //already have
+    XLsoot_send s;
+    s.soot=soot;
+    strcpy(s.op_name,op_name);
+    ll_add_member_tail(&event->soot_send_ll,&s,sizeof(XLsoot_send));
+    return 1;
+}
+
+int soot_remove(event_id_t id,const char * op_name){
+    if(op_name==NULL)return 0;
+    XLevent * event=event_get_by_id(id);
+    if(event==NULL)return 0;
+    XLll_member * member=ll_get_member_compare(&event->soot_send_ll,0,strlen(op_name)+1,(void*)op_name);
+    ll_del_member(&event->soot_send_ll,member);
+    return 1;
+}
+
+
+void * soot_thread(void * arg){
+    XLsoot_arg * soot_arg=(XLsoot_arg*)arg;
+    soot_arg->soot(&soot_arg->par);
+    free(arg);
+    return NULL;
+}
+
+int soot_run(SOOT soot,XLsoot_par * par){
+    if(soot==NULL||par==NULL)return 0;
+    pthread_t thread;
+    XLsoot_arg * arg=(XLsoot_arg*)malloc(sizeof(XLsoot_arg));
+    arg->par=*par;
+    arg->soot=soot;
+    pthread_create(&thread,NULL,soot_thread,arg);//&arg);
+    return 1;
+}
+

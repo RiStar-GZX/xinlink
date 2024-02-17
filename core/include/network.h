@@ -28,7 +28,7 @@
 #define SEND_QUEUE          1
 #define RECIVE_QUEUE        2
 
-#define PAK_MAX_SIZE        1024
+#define PAK_MAX_SIZE        2048
 
 #define CONNECT_REQUEST     1
 #define CONNECT_ACCPET      0
@@ -53,8 +53,9 @@ enum pak_connect_mode{
 enum source_mode{
     SOURCE_EVENTID           =1,
     SOURCE_APPNAME             ,
-    SOURCE_ACCESS              ,
+    //SOURCE_ACCESS              ,
     SOURCE_SYSTEM              ,
+    SOURCE_DEVICE              ,
 };
 //SIGN
 
@@ -71,7 +72,7 @@ enum queue_type{
     //QUEUE_TYPE_LINK_INFO,
 };
 
-
+#define OUT_TIME 10000
 
 void data_show(uint8_t *data,uint size);
 void data_add(uint8_t *data,int * p,void * _struct,uint size);
@@ -80,7 +81,6 @@ void data_get(uint8_t *data,int * p,void * _struct,uint size);
 int data_get_str(uint8_t *data,int *p,char * str);
 char * data_get_str_p(uint8_t *data,int *p);
 /*--------------*/
-
 XLnet network_get_local_info(void);
 int TCP_send(XLnet * net,uint8_t * data,int datasize);
 int Broadcast_send (void *buf,int bufsize);
@@ -98,7 +98,7 @@ XLqueue_head * queue_broadcast(void);
 XLqueue_head * queue_recv(void);
 int queue_init(void);
 
-int network_thread_init(void);
+int network_init(void);
 
 //XLpak_ins * buf_to_pak_ins(uint8_t * buf);
 //uint8_t * pak_ins_to_buf(XLpak_ins *pak_ins,int * size);
@@ -126,8 +126,16 @@ uint8_t * pak_info_to_buf(XLpak_info * info,uint * size);
 int network_get_event_info(uint8_t * buf);
 
 XLpak_info * buf_to_pak_info(uint8_t * buf);
-/*
-int plu_send_info_require(event_id_t id,const char * op_name);
-int plu_return_info_require(XLsource * source,const char * op_name,XLll *device_mark);
-*/
+
+int event_send_ins(event_id_t id,XLsource *receiver,XLins * ins);
+int event_send_ins_soot(event_id_t id,XLsource *receiver,XLins * ins,SOOT soot);
+int dev_send_ins(dev_id_t id,XLsource *receiver,XLins * ins);
+int dev_send_ins_soot(dev_id_t id,XLsource *receiver,XLins * ins,SOOT soot);
+XLpak_ins * wait_ins_return(event_id_t event_id,uint mark,uint time);
+int event_return_ins(event_id_t id,XLsource * receiver,uint mark,XLins * ins);
+
+int send_inss(unknow_id_t id,bool event0_dev1,XLsource *receiver,XLins * ins,SOOT soot,uint out_time);
+
+void * out_times(void * arg);
+
 #endif // NETWORK_H

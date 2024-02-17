@@ -15,7 +15,8 @@ find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 include_directories(./)
 include_directories(./core/include)
 include_directories(./dsp)
-
+include_directories(./dsp/moonlight)
+include_directories(./dsp/usbip)
 
 set(PROJECT_SOURCES
         main.cpp
@@ -27,9 +28,8 @@ set(PROJECT_SOURCES
         ./core/src/instruction.cpp
         ./core/src/network.cpp
         ./core/src/ll.cpp
-        ./core/src/xlplugin.cpp
         ./dsp/dsp.cpp
-        ./dsp/interface.cpp
+        ./dsp/moonlight/moonlight.cpp
 )
 
 if(${QT_VERSION_MAJOR} GREATER_EQUAL 6)
@@ -51,6 +51,22 @@ else()
     else()
         add_executable(xinlink_ui
             ${PROJECT_SOURCES}
+
+            xuisetting.h xuisetting.cpp xuisetting.ui
+            xuidsp.h xuidsp.cpp xuidsp.ui
+            xuiconsole.h xuiconsole.cpp xuiconsole.ui
+            xuiabout.h xuiabout.cpp xuiabout.ui
+            xuiconsoleball.h xuiconsoleball.cpp xuiconsoleball.ui
+
+            xuipixmapitem.h xuipixmapitem.cpp
+            dsp/monitor.h
+            dsp/monitor.cpp
+            dsp/moonlight/moonlight.cpp dsp/moonlight/moonlight.h
+            core/src/device.cpp
+            core/include/device.h
+            dsp/usbip/usbip.h dsp/usbip/usbip.cpp
+
+
         )
     endif()
 endif()
@@ -58,7 +74,7 @@ endif()
 target_link_libraries(xinlink_ui PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 
 find_package(Threads REQUIRED)
-target_link_libraries(xinlink_ui PRIVATE Threads::Threads curl)
+target_link_libraries(xinlink_ui PRIVATE Threads::Threads uv)
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
 # If you are developing for iOS or macOS you should consider setting an

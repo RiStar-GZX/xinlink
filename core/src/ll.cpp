@@ -187,7 +187,7 @@ XLll_member * ll_get_member_compare(XLll * ll,uint front_size,uint size,void *co
 
     XLll_member * member_now=ll->head;
     for(int i=0;i<ll->member_num;i++){
-        void * data=member_now->data;
+        uint8_t * data=(uint8_t*)member_now->data;
         data+=front_size;
         if(memcmp(data,compare,size)==0)return member_now;
         member_now=member_now->next;

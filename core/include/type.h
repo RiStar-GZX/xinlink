@@ -1,5 +1,6 @@
 #ifndef TYPE_H
 #define TYPE_H
+#include <time.h>
 
 //config
 #define PLATFORM_LINUX
@@ -11,11 +12,11 @@
 #define ENABLE   1
 #define DISABLE  0
 
-#define NAME_LENGTH 64
-#define CORE_NAME_LENGTH 64
-#define APP_NAME_LENGTH 64
-#define DEV_NAME_LENGTH 64
-#define APP_NAME_LENGTH 64
+#define NAME_LENGTH 32
+#define CORE_NAME_LENGTH NAME_LENGTH
+#define APP_NAME_LENGTH NAME_LENGTH
+#define DEV_NAME_LENGTH NAME_LENGTH
+#define APP_NAME_LENGTH NAME_LENGTH
 /* base */
 #ifndef uint_8_t
 typedef unsigned              char     uint8_t;
@@ -76,6 +77,10 @@ typedef unsigned int      app_contain_id_t;
 
 #ifndef event_id_t
 typedef unsigned int      event_id_t;
+#endif
+
+#ifndef unknow_id_t
+typedef unsigned int      unknow_id_t;
 #endif
 
 #ifndef mon_id_t
@@ -143,13 +148,14 @@ enum arg_type{
     ARG_TYPE_INT =1,
     ARG_TYPE_FLOAT,
     ARG_TYPE_STR ,
-    ARG_TYPE_XLLL
+    ARG_TYPE_XLLL ,
+    ARG_TYPE_DATA ,
 };
 
 typedef struct XLins_arg
 {
     char  name[NAME_LENGTH];
-    //char * name;    //only ins ca char*
+    //char * name;    //char*
     uint8_t type;
     uint data_size;
     void * data;
@@ -169,11 +175,15 @@ typedef struct XLdevice_mark{
     XLsource source; //biao ji sp
 }XLdevice_mark;
 
+enum ins_mode{
+    INS_SEND=0,
+    INS_RECV,
+};
+
 typedef struct XLins
 {
     char op_name[NAME_LENGTH];
     XLll arg_ll;    //XLins_arg
-    //XLll device_mark;   //XLdevice_mark
 }XLins;
 
 //指令网络包结构体
@@ -181,6 +191,8 @@ typedef struct XLpak_ins{
     XLpak_base base;
     XLsource sender;
     XLsource receiver;
+    uint mode;  //ins_mode
+    uint mark;
     XLins Ins;
 }XLpak_ins;
 
@@ -243,7 +255,8 @@ typedef struct XLcore {
     XLnet net;
     uint8_t safety;
     //XLll * sign_ll;
-    XLll * app_info_ll;   //XLapp_info
+    XLll device_ll;   //XLdevice_info
+    //XLll * app_info_ll;   //XLapp_info
 }XLcore;
 
 
@@ -259,10 +272,8 @@ enum event_type{
 //传入事件函数的参数
 typedef struct XLevent_par{
     XLsource * source;
-    //XLsign * sign;
-    //int mode;
+    event_id_t event_id;
     mon_id_t mon_id;
-    //XLqueue_in pak_in;
 }XLevent_par;
 
 //事件函数指针
@@ -283,6 +294,36 @@ typedef struct XLapp_info{
     EVENT event;
 }XLapp_info;
 
+enum ret_ins_mark_mode{
+    RET_INS_MARK_MODE_INS=0,
+    RET_INS_MARK_MODE_SOOT,
+};
+
+enum soot_error_code{
+    SOOT_ERROR_CODE_NONE=0,
+    SOOT_ERROR_CODE_TIMEOUT,
+};
+
+typedef struct XLsoot_par{
+    XLpak_ins * ins;
+    XLsource * source;
+    event_id_t event_id;
+    uint error_code;
+}XLsoot_par;        //
+
+
+typedef  void *(*SOOT)(XLsoot_par * par);
+
+typedef struct ret_ins
+{
+    uint mark;
+    uint mode;      //soot or pak_ins;
+    XLpak_ins * ins;
+    clock_t time;
+    uint out_time;
+    SOOT soot;
+}ret_ins;
+
 //事件结构体
 typedef struct XLevent{
     event_id_t id;
@@ -290,6 +331,8 @@ typedef struct XLevent{
 
     XLapp_info info;
     EVENT event;
+    XLll soot_send_ll;   //XLsoot_send
+    XLll ret_ins_ll; //ret_ins
 }XLevent;
 
 
@@ -310,25 +353,84 @@ typedef struct XLmonitor{
     XLqueue_head queue_head;
 }XLmonitor;
 
-
-enum arg_device_state{
-    ARG_DEVICE_STATE_IN=1,
-    ARG_DEVICE_STATE_OUT=2,
-    ARG_DEVICE_STATE_BOTH=4,
+/****************************/
+enum device_direction{  //连接朝向性
+    DEVICE_DIRECTION_IN=1,          //0000 0001
+    DEVICE_DIRECTION_OUT=2,         //0000 0010
+    DEVICE_DIRECTION_BOTH=4,        //0000 0100
 };
 
-enum arg_device_ab_or_co{
+/*enum arg_device_ab_or_co{
     ARG_DEVICE_AB=1,
     ARG_DEVICE_CO,
-};
+};*/
 
-typedef struct arg_device
+typedef struct arg_device           //XUI
 {
     char only_name[NAME_LENGTH];
     char show_name[NAME_LENGTH];
-    uint8_t state;
-    uint8_t abco;
 }arg_device;
 
+typedef struct XLdevice_source{ //设备来源：用于区分设备，标记唯一设备
+    XLnet core_net;    //core
 
+    dev_id_t id;
+    //char name[NAME_LENGTH];
+    //uint8_t direction;
+}XLdevice_source;
+
+enum device_reset{              //
+    DEVICE_ALREADY_RESET=0,
+    DEVICE_NOT_RESET ,
+};
+
+typedef struct XLdevice_info{   //设备信息：用于存储其他核心的设备的信息
+    //dev_id_t id;
+    //XLnet net;
+    XLdevice_source source;
+    char protocol[NAME_LENGTH];
+    char showname[NAME_LENGTH];
+    char onlyname[NAME_LENGTH];
+    uint8_t direction;          //设备的连接朝向性
+}XLdevice_info;
+
+typedef struct XLdevice{        //设备：用于存储本地设备的信息
+    dev_id_t id;
+    //XLdevice_source source;
+    char protocol[NAME_LENGTH];
+    char showname[NAME_LENGTH];
+    char onlyname[NAME_LENGTH];
+    uint8_t direction;          //设备的连接朝向性
+
+    bool reset; //ENABLE DISABLE
+    event_id_t event_id;
+    XLll device_source_ll; //XLdevice_source
+
+}XLdevice;
+
+
+typedef struct connect_info{
+    XLdevice_info * out;
+    XLdevice * local;
+}connect_info;
+
+
+
+/********************/
+
+
+
+typedef struct XLsoot_arg{
+    SOOT soot;
+    XLsoot_par par;
+}XLsoot_arg;
+
+
+typedef struct XLsoot_send{
+    char op_name[NAME_LENGTH];
+    SOOT soot;
+}XLsoot_send;        //
+
+
+/********************/
 #endif // TYPE_H

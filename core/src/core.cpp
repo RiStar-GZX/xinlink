@@ -1,17 +1,14 @@
 #include <core.h>
 
-XLll * core_ll;
+XLll * core_ll=ll_create(sizeof(XLcore));
 
 int core_init(void)
 {
     extern XLll *core_ll;
-    if(core_ll!=NULL)return -1;
-    core_ll=ll_create(sizeof(XLcore));
     XLcore core_new;
     core_new.id=1;
     core_new.net=network_get_local_info();
     core_new.safety=CORE_STATE_VERIFIED;
-    //core_new.sign_ll=ll_create(sizeof(XLsign));
     strcpy(core_new.name,"core1");
     ll_add_member_head(core_ll,&core_new,sizeof(XLcore));
     return 1;
@@ -22,7 +19,7 @@ int xinlink_init(void)
 {
     if(core_init()<=0)return -1;
     queue_init();
-    if(network_thread_init()<=0)return -1;
+    if(network_init()<=0)return -1;
     return 1;
 }
 
@@ -33,7 +30,7 @@ int core_add(XLnet * net,const char* name)
     core_new.net=*net;
     core_new.safety=CORE_STATE_UNVERIFIED;
     strcpy(core_new.name,name);
-    core_new.app_info_ll=NULL;
+    core_new.device_ll=*ll_create(sizeof(XLdevice_info));
     core_new.id=1;
 
     extern XLll * core_ll;
@@ -95,27 +92,34 @@ int core_remove(core_id_t id)
         XLcore * core_now=(XLcore*)member_now->data;
         if(core_now->id==id){
             //Warn:free_sign_ll
+            member_now=member_now->next;
             ll_del_member_num(core_ll,i);
             return 1;
         }
-        member_now=member_now->next;
+        else member_now=member_now->next;
     }
     return -1;
 }
 
 XLcore * core_get_by_id(core_id_t id){
     extern XLll * core_ll;
-    return (XLcore*)ll_get_member_compare(core_ll,FRONTSIZE_CORE_ID,sizeof(core_id_t),&id)->data;
+    XLll_member * member=ll_get_member_compare(core_ll,FRONTSIZE_CORE_ID,sizeof(core_id_t),&id);
+    if(member==NULL)return NULL;
+    return (XLcore*)member->data;
 }
 
 XLcore * core_get_by_net(XLnet * net){
     extern XLll * core_ll;
-    return (XLcore*)ll_get_member_compare(core_ll,FRONTSIZE_CORE_NET,sizeof(IP),net)->data;
+    XLll_member * member=ll_get_member_compare(core_ll,FRONTSIZE_CORE_NET,sizeof(IP),net);
+    if(member==NULL)return NULL;
+    return (XLcore*)member->data;
 }
 
 XLcore * core_get_by_ip(IP ip){
     extern XLll * core_ll;
-    return (XLcore*)ll_get_member_compare(core_ll,FRONTSIZE_CORE_NET_IP,sizeof(IP),&ip)->data;
+    XLll_member * member=ll_get_member_compare(core_ll,FRONTSIZE_CORE_NET_IP,sizeof(IP),&ip);
+    if(member==NULL)return NULL;
+    return (XLcore*)member->data;
 }
 
 XLcore * core_get_by_name(const char* name)
@@ -123,7 +127,9 @@ XLcore * core_get_by_name(const char* name)
     extern XLll * core_ll;
     int name_len=strlen(name)+1;
     if(name_len>NAME_LENGTH)return NULL;
-    return (XLcore*)ll_get_member_compare(core_ll,FRONTSIZE_CORE_NAME,name_len,(void*)name)->data;
+    XLll_member * member=ll_get_member_compare(core_ll,FRONTSIZE_CORE_NAME,name_len,(void*)name);
+    if(member==NULL)return NULL;
+    return (XLcore*)member->data;
 }
 
 int core_rename(core_id_t id,const char* name)

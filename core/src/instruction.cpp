@@ -43,6 +43,7 @@ XLins * ins_create3(int num,...){
     return ins;
 }
 
+
 XLins * ins_create(const char * op_name,const char * format,...){
     if(op_name==NULL||format==NULL)return NULL;
     va_list ap;
@@ -52,7 +53,6 @@ XLins * ins_create(const char * op_name,const char * format,...){
     XLins * ins=(XLins*)malloc(sizeof(XLins));
     strcpy(ins->op_name,op_name);
     ins->arg_ll=*ll_create(sizeof(XLins_arg));
-
     char * p=(char*)format;
     for(int i=0;i<strlen(format);i++){
         if(*p==' '){
@@ -94,11 +94,11 @@ XLins * ins_create(const char * op_name,const char * format,...){
 //name|type|data
 int message(XLpak_ins *pak_ins,const char * op_name,uint num,...){
     if(pak_ins==NULL||op_name==NULL)return 0;
+    if(strcmp(op_name,pak_ins->Ins.op_name)!=0)return 0;
     va_list ap;
     va_start(ap,num);
     for(int i=0;i<num;i++){
         char * name=va_arg(ap,char*);
-        //int type=va_arg(ap,int);
         if(INS_get_par(&pak_ins->Ins,name)==NULL)return 0;
     }
     return 1;
@@ -166,8 +166,20 @@ int ins_add_arg(XLins *ins,const char * name,uint type,void * data){
         return 0;
         break;
     }
-    arg.data=malloc(sizeof(arg.data));
+    arg.data=malloc(arg.data_size);
     memcpy(arg.data,data,arg.data_size);
+    ll_add_member_tail(&ins->arg_ll,&arg,sizeof(XLins_arg));
+    return 1;
+}
+
+int ins_add_arg_data(XLins *ins,const char * name,void * data,uint datasize){
+    if(ins==NULL||name==NULL||data==NULL)return 0;
+    XLins_arg arg;
+    strcpy(arg.name,name);
+    arg.type=ARG_TYPE_DATA;
+    arg.data_size=datasize;
+    arg.data=malloc(datasize);
+    memcpy(arg.data,data,datasize);
     ll_add_member_tail(&ins->arg_ll,&arg,sizeof(XLins_arg));
     return 1;
 }
@@ -177,8 +189,11 @@ int ins_del_arg(XLins * ins,const char * name){
     XLll_member * member=ins->arg_ll.head;
     for(int i=0;i<ins->arg_ll.member_num;i++){
         XLins_arg * arg=(XLins_arg*)member->data;
-        if(strcmp(name,arg->name)==0)ll_del_member_num(&ins->arg_ll,i);
-        member=member->next;
+        if(strcmp(name,arg->name)==0){
+            member=member->next;
+            ll_del_member_num(&ins->arg_ll,i);
+        }
+        else member=member->next;
     }
     return 1;
 }
@@ -205,16 +220,18 @@ int INS_cpy(XLins * dect,XLins * src){
 //               指令的处理转发                   //
 //----------------------------------------------//
 int ins_send_to_event(XLpak_ins * ins){
-    //printf("INS_SEND_TO_EVENT!:");
+    printf("INS_SEND_TO_EVENT!:");
     //ins_printf(&ins->Ins);
     if(ins->receiver.mode==SOURCE_SYSTEM){
-        if(message(ins,"SYS_appinfo_send",0))
+        if(message(ins,"device_send",0))
         {
-            recv_appinfo(ins);
+            printf("gg\n");
+            recv_deviceinfo(ins);
         }
-        if(message(ins,"SYS_appinfo_req",0))
+        if(message(ins,"device_req",0))
         {
-            recv_appinfo_req(ins);
+            printf("hh\n");
+            recv_deviceinfo_req(ins);
         }
         return 1;
     }
@@ -230,7 +247,7 @@ int ins_send_to_event(XLpak_ins * ins){
         XLsource *source;
         source=&monitor_now->receiver;
         if(monitor_now->receiver.mode==ins->receiver.mode){
-            if((source->mode==SOURCE_EVENTID||source->mode==SOURCE_ACCESS)
+            if((source->mode==SOURCE_EVENTID)
                 &&source->id==ins->receiver.id)num++;
             if(source->mode==SOURCE_APPNAME&&strcmp(source->name,ins->receiver.name)==0){
                 num++;
@@ -317,10 +334,11 @@ int monitor_remove(mon_id_t id)
         XLmonitor * monitor_now=(XLmonitor*)member_now->data;
         if(monitor_now->id==id){
             monitor_remove_all_member(monitor_now->id);
+            member_now=member_now->next;
             ll_del_member_num(monitor_ll,i);
             return 1;
         }
-        member_now=member_now->next;
+        else member_now=member_now->next;
     }
     return -1;
 }
@@ -426,10 +444,17 @@ XLll * INS_get_par_ll(XLins * ins,const char * name){
     return ll_to_arg_type_xlll((uint8_t*)arg->data);
 }
 
+void * INS_get_par_data(XLins * ins,const char * name,uint * datasize){
+    XLins_arg * arg=INS_get_par(ins,name);
+    if(arg==NULL)return NULL;
+    if(arg->type!=ARG_TYPE_XLLL)return NULL;
+    return ll_to_arg_type_xlll((uint8_t*)arg->data);
+}
+
 int source_cmp(XLsource *source1,XLsource *source2){
     int i=0;
     if(source1->mode==source2->mode)i++;
-    if((source1->mode==SOURCE_EVENTID||source1->mode==SOURCE_ACCESS)&&source1->id==source2->id)i+=1;
+    if(source1->mode==SOURCE_EVENTID&&source1->id==source2->id)i+=1;
     if(source1->mode==SOURCE_APPNAME&&strcmp(source1->name,source2->name)==0)i+=1;
     if(source1->net.ip==source2->net.ip)i+=1;
     if(i==3)return 1;
@@ -449,6 +474,17 @@ int source_cpy(XLsource * source1,XLsource * source2){
 }
 
 /*-----------------------------------------------------------------------*/
+int file_wait_end(FILE * file,int num,int time){
+    for(int i=0;i<num;i++){
+        getc(file);
+    }
+    for(int i=0;i<1000;i++){
+        char c=fgetc(file);
+        if(c==EOF)return 1;
+        usleep(time);
+    }
+    return 0;
+}
 
 int file_get_str(FILE * file,const char * str){
     if(str==NULL||file==NULL)return 0;
@@ -511,122 +547,3 @@ void str_del_char(const char * str,int p){
 }
 /*-------------------------------------------------------------------------*/
 
-int event_linkinfo_new(XLll * ll,const char * only_name,const char * show_name,int state,int abco){
-    if(ll==NULL||only_name==NULL)return 0;
-    arg_device arg_dev;
-    strcpy(arg_dev.only_name,only_name);
-    if(show_name!=NULL)strcpy(arg_dev.show_name,show_name);
-    arg_dev.abco=abco;
-    arg_dev.state=state;
-    ll_add_member_tail(ll,&arg_dev,sizeof(arg_device));
-    return 1;
-}
-
-int event_linkinfo_update(XLll * ll_old,XLll * ll_new){
-    if(ll_old==NULL||ll_new==NULL)return 0;
-    XLll_member * member_old=ll_old->head;
-
-    //del old
-    for(int i=0;i<ll_old->member_num;i++){
-        arg_device * dev_old=(arg_device*)member_old->data;
-        XLll_member * new_member=ll_get_member_compare(ll_new,0,strlen(dev_old->only_name)+1,dev_old->only_name);
-        if(new_member!=NULL){
-            member_old=member_old->next;
-            continue;
-        }
-
-        XLll_member * temp=member_old->next;
-        ll_del_member(ll_old,member_old);
-        member_old=temp;
-        printf("del!\n");
-    }
-
-    //add new
-    XLll_member * member_new=ll_new->head;
-    for(int i=0;i<ll_new->member_num;i++){
-
-        arg_device * dev_new=(arg_device*)member_new->data;
-        XLll_member * old_member=ll_get_member_compare(ll_old,0,strlen(dev_new->only_name)+1,dev_new->only_name);
-        if(old_member==NULL){
-            ll_add_member_tail(ll_old,dev_new,sizeof(arg_device));
-        }
-        if(old_member!=NULL){
-            arg_device * dev_old=(arg_device*)old_member->data;
-            if(dev_new->state!=0)dev_old->state=dev_new->state;
-            if(dev_new->state!=0)dev_old->state=dev_new->state;
-            if(dev_new->show_name!=NULL)strcpy(dev_old->show_name,dev_new->show_name);
-        }
-        member_new=member_new->next;
-    }
-    return 1;
-}
-
-int event_linkinfo_del(XLll * ll,const char * only_name){
-    if(ll==NULL||only_name==NULL)return 0;
-    XLll_member * member=ll_get_member_compare(ll,0,64,(char*)only_name);
-    return ll_del_member(ll,member);
-}
-
-arg_device * event_linkinfo_get(XLll * ll,const char * only_name){
-    if(ll==NULL||only_name==NULL)return 0;
-    XLll_member * member=ll_get_member_compare(ll,0,64,(char*)only_name);
-    if(member==NULL)return NULL;
-    return (arg_device*)member->data;
-}
-
-/*---------------------------------------------------------------------*/
-
-int send_appinfo(core_id_t core_id){
-    XLcore * core=core_get_by_id(core_id);
-    if(core==NULL||core_id==1)return 0;
-    XLins * ins;
-    ins=ins_create("SYS_appinfo_send","");
-    XLll *ll=ll_create(sizeof(XLapp_info));
-    extern XLll * event_ll;
-    XLll_member *member=event_ll->head;
-    for(int i=0;i<event_ll->member_num;i++){
-        XLevent * event=(XLevent *)member->data;
-        ll_add_member_tail(ll,&event->info,sizeof(XLapp_info));
-        member=member->next;
-    }
-    ins_add_arg(ins,"app",ARG_TYPE_XLLL,ll);
-    XLsource source_recv;
-    XLsource source_send;
-    source_recv.mode=SOURCE_SYSTEM;
-    source_send.mode=SOURCE_SYSTEM;
-    source_send.net=network_get_local_info();
-    source_recv.net=core->net;
-    network_send_ins(&source_send,&source_recv,ins);
-    return 1;
-}
-
-int send_appinfo_req(core_id_t core_id){
-    XLcore * core=core_get_by_id(core_id);
-    if(core==NULL||core_id==1)return 0;
-    XLins * ins;
-    ins=ins_create("SYS_appinfo_req","");
-    XLsource source_recv;
-    XLsource source_send;
-    source_recv.mode=SOURCE_SYSTEM;
-    source_send.mode=SOURCE_SYSTEM;
-    source_send.net=network_get_local_info();
-    source_recv.net=core->net;
-    network_send_ins(&source_send,&source_recv,ins);
-    return 1;
-}
-
-void recv_appinfo(XLpak_ins * pak_ins){
-    if(pak_ins==NULL)return;
-    XLcore * core=core_get_by_net(&pak_ins->sender.net);
-    XLll * ll=INS_get_par_ll(&pak_ins->Ins,"app");
-    ll_free(core->app_info_ll);
-    core->app_info_ll=ll;
-    if(core==NULL)return;
-}
-
-void recv_appinfo_req(XLpak_ins * pak_ins){
-    if(pak_ins==NULL)return;
-    XLcore * core=core_get_by_net(&pak_ins->sender.net);
-    if(core==NULL)return;
-    send_appinfo(core->id);
-}

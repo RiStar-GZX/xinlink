@@ -12,6 +12,7 @@
 #include <event.h>
 #include <network.h>
 #include <instruction.h>
+#include <device.h>
 #include <ll.h>
 
 #define CORE_MYSELF_ID 1

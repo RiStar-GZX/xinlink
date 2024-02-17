@@ -17,7 +17,7 @@
 #define FRONTSIZE_APPCONTAIN_ID sizeof(char)*APP_NAME_LENGTH
 
 #define FRONTSIZE_EVENT_ID 0
-
+#define FRONTSIZE_EVENT_NAME sizeof(event_id_t)+sizeof(mon_id_t)
 
 enum SIGN_MODE{
     SIGN_CS_SERVER =1,
@@ -41,6 +41,7 @@ XLapp_contain * app_get_by_name(const char* name);
 
 event_id_t event_create(XLapp_info * info,EVENT event);
 XLevent * event_get_by_id(event_id_t id);
+XLevent * event_get_by_name(const char * name);
 int event_set_name(event_id_t id,const char* name);
 
 int event_run(event_id_t id);
@@ -53,5 +54,9 @@ int event_set_device_mark(event_id_t id,const char * name,XLsource * source,uint
 int event_remove_device_mark(event_id_t id,const char * name);
 
 int send_to_link_event(XLpak_info * info);
+
+int soot_create(event_id_t id,const char * op_name,SOOT soot);
+int soot_remove(event_id_t id,const char * op_name);
+int soot_run(SOOT soot,XLsoot_par * par);
 
 #endif // EVENT_H
