@@ -16,6 +16,7 @@ void device_show(void);
 int device_remove(dev_id_t id);
 XLdevice * device_get_local(dev_id_t id);
 XLdevice_info * device_info_get(core_id_t core_id,dev_id_t dev_id);
+XLdevice_info * device_info_get_by_source(XLdevice_source source);
 XLll *  event_get_device(event_id_t event_id);
 
 /*

@@ -236,25 +236,27 @@ void * event_thread(void * arg)
     XLevent *event=(XLevent*)arg;
     XLsource * source=monitor_get_source(event->mon_id);
 
-    /*XLevent_par par;
-    par.source=source;
-    par.event_id=event->id;
-    par.mon_id=event->mon_id;*/
-
     pthread_t thread;
     pthread_create(&thread,NULL,e_thread,event);
     while(1)
     {
+
         XLpak_ins * ins_recv=monitor_get_pak_ins_delay(event->mon_id,5000);
         if(ins_recv==NULL)continue;
+
+        XLsoot_par soot_par;
+        soot_par.event_id=event->id;
+        soot_par.source=source;
+        soot_par.ins=ins_recv;
+        soot_par.error_code=SOOT_ERROR_CODE_NONE;
+        if(ins_recv->receiver.mode==SOURCE_DEVICE)
+            soot_par.device_id=ins_recv->receiver.id;
+        else soot_par.device_id=0;
+
         if(ins_recv->mode==INS_SEND){
             XLll_member * member=ll_get_member_compare(&event->soot_send_ll,0,strlen(ins_recv->Ins.op_name)+1,(void*)ins_recv->Ins.op_name);
             if(member!=NULL){
                 XLsoot_send * soot=(XLsoot_send*)member->data;
-                XLsoot_par soot_par;
-                soot_par.event_id=event->id;
-                soot_par.source=source;
-                soot_par.ins=ins_recv;
                 soot_run(soot->soot,&soot_par);
             }
         }
@@ -266,11 +268,6 @@ void * event_thread(void * arg)
                     mark->ins=ins_recv;
                 }
                 if(mark->mode==RET_INS_MARK_MODE_SOOT&&mark->soot!=NULL){
-                    XLsoot_par soot_par;
-                    soot_par.event_id=event->id;
-                    soot_par.source=source;
-                    soot_par.ins=ins_recv;
-                    soot_par.error_code=SOOT_ERROR_CODE_NONE;
                     ll_del_member(&event->ret_ins_ll,member);
                     soot_run(mark->soot,&soot_par);
                 }

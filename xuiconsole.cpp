@@ -102,7 +102,7 @@ void XuiConsole::update_auto(void){
     extern monitor_contain contain;
     contain.operate.mode=MONITOR_OPMODE_LSDEV;
     contain.operate.state=OPSTATE_DOING;
-    contain.operate.event_id=event_now;
+    contain.operate.id[1]=event_now;
     int mode=contain.operate.mode;
    // for(int i=0;i<30;i++){
         while(contain.operate.state!=OPSTATE_FINISH){
@@ -140,7 +140,7 @@ void XuiConsole::on_pushButton_clicked()
 {
     if(ui->listWidget_out->currentItem()==NULL)return;
     extern monitor_contain contain;
-    contain.operate.event_id=event_now;
+    contain.operate.id[1]=event_now;
     QByteArray ba=ui->listWidget_out->currentItem()->text().toUtf8();
     strcpy(contain.operate.ip,ba.data());
     strcpy(contain.operate.device_name,device_now->only_name);

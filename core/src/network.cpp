@@ -936,17 +936,32 @@ int network_send_ins(XLsource * sender,XLsource *receiver,XLins * ins){
     return 1;
 }
 
-int network_send_ins2(XLsource * sender,XLsource *receiver,uint mode,uint mark,XLins * ins){
-    if(ins==NULL)return 0;
+int network_send_ins2(unknow_id_t id,bool event0_dev1,XLsource *receiver,uint mode,uint mark,XLins * ins){
+    if(ins==NULL||receiver==NULL)return 0;
     XLcore * core=core_get_by_net(&receiver->net);
     if(core==NULL)return 0;
+    XLevent * event;
+    XLsource sender;
+    sender.net=network_get_local_info();
+    sender.id=id;
+    if(event0_dev1==1){
+        XLdevice * device=device_get_local(id);
+        if(device==NULL)return 0;
+        event=event_get_by_id(device->event_id);
+        sender.mode=SOURCE_DEVICE;
+    }
+    else {
+        event=event_get_by_id(id);
+        sender.mode=SOURCE_EVENTID;
+    }
+    if(event==NULL)return 0;
 
     XLpak_ins * pak_ins=(XLpak_ins*)malloc(sizeof(XLpak_ins));
     pak_ins->base.mode=SOURCE_EVENTID+(SOURCE_EVENTID<<4)+(NETWORK_MODE_INS<<12);
     pak_ins->base.net_sender=core_get_by_id(CORE_MYSELF_ID)->net;
     pak_ins->base.net_receiver=core->net;
 
-    pak_ins->sender=*sender;
+    pak_ins->sender=sender;
     pak_ins->receiver=*receiver;
     pak_ins->mode=mode;
     pak_ins->mark=mark;
@@ -992,8 +1007,8 @@ int send_inss(unknow_id_t id,bool event0_dev1,XLsource *receiver,XLins * ins,SOO
         event=event_get_by_id(id);
         sender.mode=SOURCE_EVENTID;
     }
-    if(event==NULL)return 0;
 
+    if(event==NULL)return 0;
 
     XLpak_ins * pak_ins=(XLpak_ins*)malloc(sizeof(XLpak_ins));
     pak_ins->base.mode=SOURCE_EVENTID+(SOURCE_EVENTID<<4)+(NETWORK_MODE_INS<<12);
@@ -1047,19 +1062,13 @@ XLpak_ins * wait_ins_return(event_id_t event_id,uint mark,uint time){
     return NULL;
 }
 
-int event_return_ins(event_id_t id,XLsource * receiver,uint mark,XLins * ins){
-    if(ins==NULL||receiver==NULL)return 0;
-    XLevent * event=event_get_by_id(id);
-    if(event==NULL)return 0;
-    XLsource sender=*monitor_get_source(event->mon_id);
-    sender.mode=SOURCE_EVENTID;
-    sender.net=network_get_local_info();
-    sender.id=event->id;
-
-    network_send_ins2(&sender,receiver,INS_RECV,mark,ins);
-    return 1;
+int event_return_ins(event_id_t id,XLpak_ins * recv_pak,XLins * ins){
+    return network_send_ins2(id,0,&recv_pak->sender,INS_RECV,recv_pak->mark,ins);
 }
 
+int device_return_ins(dev_id_t id,XLpak_ins * recv_pak,XLins * ins){
+    return network_send_ins2(id,1,&recv_pak->sender,INS_RECV,recv_pak->mark,ins);
+}
 
 void * out_times(void * arg){
     extern XLll * event_ll;

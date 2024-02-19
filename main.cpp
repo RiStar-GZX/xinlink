@@ -19,14 +19,20 @@ int main(int argc, char *argv[])
     return a.exec();
 }
 
+
 /*
 void * test1_soot(XLsoot_par * par){
-    //event_return_ins(par->event_id,&par->ins->sender,par->ins->mark,ins_create("test",""));
+    printf("test1 connectwith soot!\n");
+    event_return_ins(par->event_id,par->ins,ins_create("recv",""));
     return NULL;
 }
 
 void * test1(XLevent_par *par){
-    soot_create(par->event_id,"test",test1_soot);
+    XLdevice * device=device_create_and_get(par->event_id,"dev_t1");
+    strcpy(device->protocol,"OK");
+    strcpy(device->showname,"dev_t1");
+    soot_create(par->event_id,OPNAME_CONNECTWITH,test1_soot);
+
     return NULL;
 }
 
@@ -37,19 +43,17 @@ void * test2_soot(XLsoot_par * par){
 }
 
 void * test2(XLevent_par *par){
+    XLdevice * device=device_create_and_get(par->event_id,"dev_t2");
+    strcpy(device->protocol,"OK");
+    strcpy(device->showname,"dev_t2");
     while(1){
-        XLsource recv;
+        int s;
+        scanf("%d",&s);
+        XLdevice_source recv;
+        recv.core_net=network_get_local_info();
         recv.id=1;
-        recv.mode=SOURCE_EVENTID;
-        recv.net=network_get_local_info();
-        event_send_ins_soot(par->event_id,&recv,ins_create("test",""),test2_soot);
-        sleep(1);
-/*
-        int mark=event_send_ins(par->event_id,&recv,ins_create("test",""));
-        XLpak_ins * ins_recv=wait_ins_return(par->event_id,mark,1000);
-        if(ins_recv==NULL)printf("test2:NONE\n");
-        else printf("test2:YES\n");
-
+        int u=device_send_connectwith(device->id,&recv,test2_soot);
+        printf("send!%d\n",u);
     }
     return NULL;
 }
@@ -62,9 +66,9 @@ int main(){
     event_create_and_run("test1");
     event_create_and_run("test2");
 
-    while(1);
+    while(1){
+        connect
+    }
     return 0;
 }
-
-
 */

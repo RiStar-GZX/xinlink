@@ -154,6 +154,9 @@ int ins_add_arg(XLins *ins,const char * name,uint type,void * data){
     case ARG_TYPE_STR:
         arg.data_size=strlen((char*)data)+1;
         break;
+    case ARG_TYPE_DEVICE_SOURCE:
+        arg.data_size=sizeof(XLdevice_source);
+        break;
     case ARG_TYPE_XLLL:
         uint data_size;
         arg.data=arg_type_xlll_to_data((XLll*)data,&data_size);
@@ -162,6 +165,7 @@ int ins_add_arg(XLins *ins,const char * name,uint type,void * data){
         ll_add_member_tail(&ins->arg_ll,&arg,sizeof(XLins_arg));
         return 1;
         break;
+
     default:
         return 0;
         break;
@@ -220,17 +224,15 @@ int INS_cpy(XLins * dect,XLins * src){
 //               指令的处理转发                   //
 //----------------------------------------------//
 int ins_send_to_event(XLpak_ins * ins){
-    printf("INS_SEND_TO_EVENT!:");
+    //printf("INS_SEND_TO_EVENT!:");
     //ins_printf(&ins->Ins);
     if(ins->receiver.mode==SOURCE_SYSTEM){
         if(message(ins,"device_send",0))
         {
-            printf("gg\n");
             recv_deviceinfo(ins);
         }
         if(message(ins,"device_req",0))
         {
-            printf("hh\n");
             recv_deviceinfo_req(ins);
         }
         return 1;
@@ -246,10 +248,18 @@ int ins_send_to_event(XLpak_ins * ins){
         int num=0;
         XLsource *source;
         source=&monitor_now->receiver;
-        if(monitor_now->receiver.mode==ins->receiver.mode){
-            if((source->mode==SOURCE_EVENTID)
-                &&source->id==ins->receiver.id)num++;
-            if(source->mode==SOURCE_APPNAME&&strcmp(source->name,ins->receiver.name)==0){
+        //if(monitor_now->receiver.mode==ins->receiver.mode){
+        if(source->mode==SOURCE_EVENTID&&source->id==ins->receiver.id)num++;
+
+            /*if(source->mode==SOURCE_APPNAME&&strcmp(source->name,ins->receiver.name)==0){
+                num++;
+            }*/
+
+        //}
+        if(ins->receiver.mode==SOURCE_DEVICE){
+            XLdevice * device=device_get_local(source->id);
+            if(device!=NULL&&source->id==device->event_id)
+            {
                 num++;
             }
         }
@@ -444,10 +454,16 @@ XLll * INS_get_par_ll(XLins * ins,const char * name){
     return ll_to_arg_type_xlll((uint8_t*)arg->data);
 }
 
+XLdevice_source * INS_get_par_device_source(XLins * ins,const char * name){
+    XLins_arg * arg=INS_get_par(ins,name);
+    if(arg==NULL)return NULL;
+    if(arg->type!=ARG_TYPE_DEVICE_SOURCE)return NULL;
+    return (XLdevice_source*)arg->data;
+}
+
 void * INS_get_par_data(XLins * ins,const char * name,uint * datasize){
     XLins_arg * arg=INS_get_par(ins,name);
     if(arg==NULL)return NULL;
-    if(arg->type!=ARG_TYPE_XLLL)return NULL;
     return ll_to_arg_type_xlll((uint8_t*)arg->data);
 }
 

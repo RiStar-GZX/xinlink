@@ -3,8 +3,7 @@
 
 #include <core.h>
 #include <stdio.h>
-
-
+#include <dsp.h>
 
 int dsp_init(void);
 

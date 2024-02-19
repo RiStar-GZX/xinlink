@@ -44,6 +44,7 @@ void XuiConsoleBall::on_pushButton_pressed()
         console_dev_index index;
         index.index=i;
         index.dev_id=device->id;
+        index.core_id=CORE_MYSELF_ID;
         ll_add_member_tail(&local_dev_index_ll,&index,sizeof(console_dev_index));
         ui->listWidget->addItem(device->showname);
         member=member->next;
@@ -167,12 +168,29 @@ void XuiConsoleBall::on_listWidget_currentRowChanged(int currentRow)
 
 void XuiConsoleBall::on_pushButton_connect_clicked()
 {
+    extern monitor_contain contain;
+    contain.operate.id[1]=console_info.local_dev.dev_id;
+    contain.operate.id[2]=console_info.local_dev.core_id;
+    contain.operate.id[3]=console_info.out_dev.dev_id;
+    contain.operate.id[4]=console_info.out_dev.core_id;
+    printf("\nss:%d %d %d %d\n",contain.operate.id[1],contain.operate.id[2],
+           contain.operate.id[3],contain.operate.id[4]);
+    contain.operate.mode=MONITOR_OPMODE_CONNECT;
+    contain.operate.state=OPSTATE_DOING;
 
 }
 
 
 void XuiConsoleBall::on_pushButton_disconnect_clicked()
 {
-
+    extern monitor_contain contain;
+    contain.operate.id[1]=console_info.local_dev.dev_id;
+    contain.operate.id[2]=console_info.local_dev.core_id;
+    contain.operate.id[3]=console_info.out_dev.dev_id;
+    contain.operate.id[4]=console_info.out_dev.core_id;
+    printf("\nss:%d %d %d %d\n",contain.operate.id[1],contain.operate.id[2],
+           contain.operate.id[3],contain.operate.id[4]);
+    contain.operate.mode=MONITOR_OPMODE_DISCONNECT;
+    contain.operate.state=OPSTATE_DOING;
 }
 

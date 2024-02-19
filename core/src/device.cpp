@@ -103,6 +103,27 @@ XLdevice_info * device_info_get(core_id_t core_id,dev_id_t dev_id){
     return (XLdevice_info*)member->data;
 }
 
+XLdevice_info * device_info_get_by_source(XLdevice_source source){
+    XLcore * core=core_get_by_net(&source.core_net);
+    if(core==NULL)return NULL;
+    if(core->id==CORE_MYSELF_ID){
+        XLdevice * device=device_get_local(source.id);
+        if(device==NULL)return NULL;
+        XLdevice_info * info=(XLdevice_info*)malloc(sizeof(XLdevice_info));
+        info->direction=device->direction;
+        strcpy(info->onlyname,device->onlyname);
+        strcpy(info->protocol,device->protocol);
+        strcpy(info->showname,device->showname);
+        info->source.id=device->id;
+        info->source.core_net=network_get_local_info();
+        return info;
+    }
+    XLll_member * member=ll_get_member_compare(&core->device_ll,0,sizeof(dev_id_t),&source.id);
+    if(member==NULL)return NULL;
+    return (XLdevice_info*)member->data;
+}
+
+
 XLll *  event_get_device(event_id_t event_id){
     extern XLll * device_ll;
     XLll * ll=ll_create(sizeof(XLdevice));
@@ -198,8 +219,10 @@ int device_op(unknow_id_t id,bool event0_dev1,
     XLins * ins;
     XLcore * core1=core_get_by_net(&device1->core_net);
     XLcore * core2=core_get_by_net(&device2->core_net);
+
     if(core1==NULL||core2==NULL)return 0;
 
+    XLdevice_source *device;
     XLsource receiver;
     receiver.mode=SOURCE_DEVICE;
     //检验是否为自己的设备
@@ -207,41 +230,45 @@ int device_op(unknow_id_t id,bool event0_dev1,
     if(event0_dev1==1&&core1->id==CORE_MYSELF_ID&&id==device1->id){
         receiver.net=core2->net;
         receiver.id=device2->id;
+        device=device2;
         mydevice++;
     }
     if(event0_dev1==1&&core2->id==CORE_MYSELF_ID&&id==device2->id){
         receiver.net=core1->net;
         receiver.id=device1->id;
+        device=device1;
         mydevice+=2;
     }
-    if(mydevice==3)return 0;    //两个都是自己的设备无法操作
+
+    if(mydevice==3)return 0;   //两个都是自己的设备无法操作
+
     if(mydevice!=0){
         if(c0_dc1==0)ins=ins_create(OPNAME_CONNECTWITH,"");
         if(c0_dc1==1)ins=ins_create(OPNAME_DISCONNECTWITH,"");
+        ins_add_arg(ins,"device",ARG_TYPE_DEVICE_SOURCE,device);
         return send_inss(id,event0_dev1,&receiver,ins,soot,OUT_TIME);
     }
     //两个设备，哪个在本机就发往哪个，如果都不在本机就发往第一个
-
     if(c0_dc1==0)ins=ins_create(OPNAME_CONNECT,"");
     if(c0_dc1==1)ins=ins_create(OPNAME_DISCONNECT,"");
-    XLdevice_source *device;
+
     if(core1->id==CORE_MYSELF_ID){
         receiver.net=core1->net;
         receiver.id=device1->id;
-        device=device1;
+        device=device2;
     }
     else if(core2->id==CORE_MYSELF_ID){
         receiver.net=core2->net;
         receiver.id=device2->id;
-        device=device2;
+        device=device1;
     }
     else{
         receiver.net=core1->net;
         receiver.id=device1->id;
-        device=device1;
+        device=device2;
     }
 
-    ins_add_arg_data(ins,"device",device,sizeof(XLdevice_source));
+    ins_add_arg(ins,"device",ARG_TYPE_DEVICE_SOURCE,device);
 
     return send_inss(id,event0_dev1,&receiver,ins,soot,OUT_TIME);
  }

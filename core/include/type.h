@@ -150,6 +150,7 @@ enum arg_type{
     ARG_TYPE_STR ,
     ARG_TYPE_XLLL ,
     ARG_TYPE_DATA ,
+    ARG_TYPE_DEVICE_SOURCE ,
 };
 
 typedef struct XLins_arg
@@ -308,11 +309,12 @@ typedef struct XLsoot_par{
     XLpak_ins * ins;
     XLsource * source;
     event_id_t event_id;
+    dev_id_t device_id;
     uint error_code;
 }XLsoot_par;        //
 
 
-typedef  void *(*SOOT)(XLsoot_par * par);
+typedef  void (*SOOT)(XLsoot_par * par);
 
 typedef struct ret_ins
 {

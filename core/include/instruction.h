@@ -22,6 +22,7 @@ int ins_del_arg(XLins * ins,const char * name);
 void ins_printf(XLins * ins);
 int INS_cpy(XLins * dect,XLins * src);
 int ins_send_to_event(XLpak_ins * ins);
+XLdevice_source * INS_get_par_device_source(XLins * ins,const char * name);
 
 mon_id_t monitor_create(XLsource * receiver);
 void monitor_show(void);

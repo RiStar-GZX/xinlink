@@ -72,7 +72,7 @@ enum queue_type{
     //QUEUE_TYPE_LINK_INFO,
 };
 
-#define OUT_TIME 10000
+#define OUT_TIME 1000000
 
 void data_show(uint8_t *data,uint size);
 void data_add(uint8_t *data,int * p,void * _struct,uint size);
@@ -132,7 +132,8 @@ int event_send_ins_soot(event_id_t id,XLsource *receiver,XLins * ins,SOOT soot);
 int dev_send_ins(dev_id_t id,XLsource *receiver,XLins * ins);
 int dev_send_ins_soot(dev_id_t id,XLsource *receiver,XLins * ins,SOOT soot);
 XLpak_ins * wait_ins_return(event_id_t event_id,uint mark,uint time);
-int event_return_ins(event_id_t id,XLsource * receiver,uint mark,XLins * ins);
+int event_return_ins(event_id_t id,XLpak_ins * recv_pak,XLins * ins);
+int device_return_ins(dev_id_t id,XLpak_ins * recv_pak,XLins * ins);
 
 int send_inss(unknow_id_t id,bool event0_dev1,XLsource *receiver,XLins * ins,SOOT soot,uint out_time);
 
